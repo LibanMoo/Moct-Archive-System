@@ -6,20 +6,25 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "seed:admin": "node seed/seedAdmin.js"
+    "seed:admin": "node seed/seedAdmin.js",
+    "contract:emit": "prisma contract emit"
   },
   "dependencies": {
+    "@prisma/client": "^7.10.1",
+    "@prisma/orm-postgres": "^8.0.0-rc.24",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
+    "dotenv": "^16.6.1",
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.9.5",
     "multer": "^2.0.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.9"
+    "@prisma/cli-engine": "^0.10.0",
+    "@types/node": "^26.6.6",
+    "nodemon": "^3.1.9",
+    "prisma": "^8.0.0-rc.34"
   }
 }
