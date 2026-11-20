@@ -1,7 +1,17 @@
-import mongoose from "mongoose";
+import postgres from "@prisma/orm-postgres/runtime";
+import { contractFromJson } from "@prisma/orm-postgres/static";
+import contractJson from "../src/prisma/contract.json" with { type: "json" };
+
+const contract = contractFromJson(contractJson);
+
+const db = postgres({
+  contract,
+  url: process.env.DATABASE_URL,
+});
 
 export default async function connectDB() {
-  if (!process.env.MONGO_URI) throw new Error("MONGO_URI is missing from .env");
-  await mongoose.connect(process.env.MONGO_URI);
-  console.log("MongoDB connected");
+  await db.connect();
+  console.log("PostgreSQL connected successfully");
 }
+
+export { db };
