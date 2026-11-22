@@ -1,23 +1,62 @@
-import "dotenv/config";
 import bcrypt from "bcryptjs";
-import connectDB from "../config/db.js";
-import User from "../models/User.js";
+import connectDB, { db } from "../config/db.js";
 
-await connectDB();
-const name = process.env.ADMIN_NAME || "System Administrator";
-const email = (process.env.ADMIN_EMAIL || "").toLowerCase().trim();
-const password = process.env.ADMIN_PASSWORD || "";
+const User = db.orm.public.User;
+const Department = db.orm.public.Department;
 
-if (!email || password.length < 10) {
-  console.error("Set ADMIN_EMAIL and ADMIN_PASSWORD (at least 10 characters) in backend/.env first.");
-  process.exit(1);
+const ADMIN_NAME = "System Administrator";
+const ADMIN_EMAIL = "admin@example.com";
+const ADMIN_PASSWORD = "admin";
+
+async function seedAdmin() {
+  try {
+    // 1. Connect to PostgreSQL
+    await connectDB();
+
+    // 2. Check whether admin exists
+    const existingAdmin = await User.where({ email: ADMIN_EMAIL }).first();
+
+    if (existingAdmin) {
+      console.log("Admin already exists:", ADMIN_EMAIL);
+      return;
+    }
+
+    // 3. Find or create Administration department
+    let department = await Department.where({ name: "Administration" }).first();
+
+    if (!department) {
+      department = await Department.create({
+        name: "Administration",
+      });
+
+      console.log("Administration department created.");
+    }
+
+    // 4. Hash password
+    const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 12);
+
+    // 5. Create admin account
+    const admin = await User.create({
+      name: ADMIN_NAME,
+      email: ADMIN_EMAIL,
+      password: passwordHash,
+      role: "admin",
+      department: department.id,
+    });
+
+    console.log("--------------------------------");
+    console.log("Admin created successfully!");
+    console.log("Name:", admin.name);
+    console.log("Email:", admin.email);
+    console.log("Role:", admin.role);
+    console.log("Department:", department.name);
+    console.log("--------------------------------");
+  } catch (error) {
+    console.error("Admin seeding failed:", error);
+    process.exitCode = 1;
+  } finally {
+    await db.close();
+  }
 }
 
-const existing = await User.findOne({ email });
-if (existing) {
-  console.log(`Admin account already exists: ${email}`);
-  process.exit(0);
-}
-await User.create({ name, email, passwordHash: await bcrypt.hash(password, 12), role: "admin" });
-console.log(`Admin created: ${email}. Sign in and change the temporary password policy according to your organisation.`);
-process.exit(0);
+seedAdmin();
