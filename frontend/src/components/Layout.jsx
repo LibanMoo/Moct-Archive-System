@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { Archive, ArrowDownToLine, ArrowUpFromLine, LayoutDashboard, Users, ScrollText, LogOut, Building2, ChartNoAxesCombined } from "lucide-react";
+import { Archive, ArrowDownToLine, ArrowUpFromLine, LayoutDashboard, Users, ScrollText, LogOut, Building2, ChartNoAxesCombined, Contact } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import ministryLogo from "../assets/ministry-logo.png";
 
@@ -12,6 +12,7 @@ export default function Layout() {
     { to: "/incoming", label: "Incoming Documents", icon: ArrowDownToLine },
     { to: "/outgoing", label: "Outgoing Documents", icon: ArrowUpFromLine },
     { to: "/archive", label: "Digital Archive", icon: Archive },
+    { to: "/correspondents", label: "Senders & Recipients", icon: Contact },
     { to: "/reports/incoming", label: "Incoming Reports", icon: ChartNoAxesCombined },
     { to: "/reports/outgoing", label: "Outgoing Reports", icon: ChartNoAxesCombined }
   ];
