@@ -23,7 +23,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'ca463038f3d29b347062a8325bff9123e99554fd498e04be9e1f5c787b72629d'>;
+  StorageHashBase<'84fcd29852b0228846071970d9f74090afd8d744a73697cd895e75046ad5623e'>;
 export type ExecutionHash =
   ExecutionHashBase<'6bcbb793edc2ae430f447ae17e8dc0521b02e575395973bbaf48ce1112e557d3'>;
 export type ProfileHash =
@@ -279,7 +279,10 @@ type FieldTypeOverrides = {
   readonly public: {
     readonly models: {
       readonly Document: {
-        readonly direction: { readonly output: 'IN' | 'OUT'; readonly input: 'IN' | 'OUT' };
+        readonly direction: {
+          readonly output: 'IN' | 'OUT' | 'INT';
+          readonly input: 'IN' | 'OUT' | 'INT';
+        };
         readonly status: {
           readonly output: 'Pending' | 'Processing' | 'Completed';
           readonly input: 'Pending' | 'Processing' | 'Completed';
@@ -307,7 +310,10 @@ export type FieldInputTypes = FieldTypesFromDomain<
 type ColumnTypeOverrides = {
   readonly public: {
     readonly Document: {
-      readonly direction: { readonly output: 'IN' | 'OUT'; readonly input: 'IN' | 'OUT' };
+      readonly direction: {
+        readonly output: 'IN' | 'OUT' | 'INT';
+        readonly input: 'IN' | 'OUT' | 'INT';
+      };
       readonly status: {
         readonly output: 'Pending' | 'Processing' | 'Completed';
         readonly input: 'Pending' | 'Processing' | 'Completed';
@@ -365,8 +371,11 @@ export namespace Models {
     id: FieldOutputTypes['public']['Department']['id'];
     name: FieldOutputTypes['public']['Department']['name'];
     updatedAt: FieldOutputTypes['public']['Department']['updatedAt'];
+    documents: public_Document[];
+    receivedInternal: public_Document[];
+    sentInternal: public_Document[];
     users: public_User[];
-    readonly [RelationKeys]?: 'users';
+    readonly [RelationKeys]?: 'documents' | 'receivedInternal' | 'sentInternal' | 'users';
   };
   export type public_Document = {
     archivedAt: FieldOutputTypes['public']['Document']['archivedAt'];
@@ -374,10 +383,12 @@ export namespace Models {
     createdAt: FieldOutputTypes['public']['Document']['createdAt'];
     createdById: FieldOutputTypes['public']['Document']['createdById'];
     department: FieldOutputTypes['public']['Document']['department'];
+    departmentId: FieldOutputTypes['public']['Document']['departmentId'];
     description: FieldOutputTypes['public']['Document']['description'];
     direction: FieldOutputTypes['public']['Document']['direction'];
     documentDate: FieldOutputTypes['public']['Document']['documentDate'];
     fileSize: FieldOutputTypes['public']['Document']['fileSize'];
+    fromDepartmentId: FieldOutputTypes['public']['Document']['fromDepartmentId'];
     id: FieldOutputTypes['public']['Document']['id'];
     isArchived: FieldOutputTypes['public']['Document']['isArchived'];
     mimeType: FieldOutputTypes['public']['Document']['mimeType'];
@@ -390,15 +401,26 @@ export namespace Models {
     status: FieldOutputTypes['public']['Document']['status'];
     storedFileName: FieldOutputTypes['public']['Document']['storedFileName'];
     subject: FieldOutputTypes['public']['Document']['subject'];
+    toDepartmentId: FieldOutputTypes['public']['Document']['toDepartmentId'];
     updatedAt: FieldOutputTypes['public']['Document']['updatedAt'];
     updatedById: FieldOutputTypes['public']['Document']['updatedById'];
     archivedBy: public_User | null;
     createdBy: public_User | null;
+    departmentInfo: public_Department | null;
+    fromDepartment: public_Department | null;
     recipientCorrespondent: public_Correspondent | null;
     senderCorrespondent: public_Correspondent | null;
+    toDepartment: public_Department | null;
     updatedBy: public_User | null;
     readonly [RelationKeys]?:
-      'archivedBy' | 'createdBy' | 'recipientCorrespondent' | 'senderCorrespondent' | 'updatedBy';
+      | 'archivedBy'
+      | 'createdBy'
+      | 'departmentInfo'
+      | 'fromDepartment'
+      | 'recipientCorrespondent'
+      | 'senderCorrespondent'
+      | 'toDepartment'
+      | 'updatedBy';
   };
   export type public_User = {
     active: FieldOutputTypes['public']['User']['active'];
@@ -704,6 +726,12 @@ type ContractBase = Omit<
                   readonly nullable: true;
                   readonly many: false;
                 };
+                readonly departmentId: {
+                  readonly dataType: 'pg/uuid';
+                  readonly codecId: 'pg/uuid@1';
+                  readonly nullable: true;
+                  readonly many: false;
+                };
                 readonly description: {
                   readonly dataType: 'pg/text';
                   readonly codecId: 'pg/text@1';
@@ -732,6 +760,12 @@ type ContractBase = Omit<
                     readonly kind: 'literal';
                     readonly value: DefaultLiteralValue<'pg/int4@1', 0>;
                   };
+                  readonly many: false;
+                };
+                readonly fromDepartmentId: {
+                  readonly dataType: 'pg/uuid';
+                  readonly codecId: 'pg/uuid@1';
+                  readonly nullable: true;
                   readonly many: false;
                 };
                 readonly id: {
@@ -814,6 +848,12 @@ type ContractBase = Omit<
                   readonly nullable: false;
                   readonly many: false;
                 };
+                readonly toDepartmentId: {
+                  readonly dataType: 'pg/uuid';
+                  readonly codecId: 'pg/uuid@1';
+                  readonly nullable: true;
+                  readonly many: false;
+                };
                 readonly updatedAt: {
                   readonly dataType: 'pg/timestamptz';
                   readonly codecId: 'pg/timestamptz-date@1';
@@ -844,6 +884,18 @@ type ContractBase = Omit<
                   readonly unique: false;
                 },
                 {
+                  readonly name: 'Document_departmentId_idx_8e261ed8';
+                  readonly prefix: 'Document_departmentId_idx';
+                  readonly columns: readonly ['departmentId'];
+                  readonly unique: false;
+                },
+                {
+                  readonly name: 'Document_fromDepartmentId_idx_57753065';
+                  readonly prefix: 'Document_fromDepartmentId_idx';
+                  readonly columns: readonly ['fromDepartmentId'];
+                  readonly unique: false;
+                },
+                {
                   readonly name: 'Document_recipientId_idx_c9527cf8';
                   readonly prefix: 'Document_recipientId_idx';
                   readonly columns: readonly ['recipientId'];
@@ -853,6 +905,12 @@ type ContractBase = Omit<
                   readonly name: 'Document_senderId_idx_4689c490';
                   readonly prefix: 'Document_senderId_idx';
                   readonly columns: readonly ['senderId'];
+                  readonly unique: false;
+                },
+                {
+                  readonly name: 'Document_toDepartmentId_idx_31864033';
+                  readonly prefix: 'Document_toDepartmentId_idx';
+                  readonly columns: readonly ['toDepartmentId'];
                   readonly unique: false;
                 },
                 {
@@ -920,6 +978,42 @@ type ContractBase = Omit<
                   readonly target: {
                     readonly namespaceId: 'public' & NamespaceId;
                     readonly tableName: 'Correspondent';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'Document';
+                    readonly columns: readonly ['departmentId'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'Department';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'Document';
+                    readonly columns: readonly ['fromDepartmentId'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'Department';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'Document';
+                    readonly columns: readonly ['toDepartmentId'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'Department';
                     readonly columns: readonly ['id'];
                   };
                 },
@@ -1018,7 +1112,7 @@ type ContractBase = Omit<
           readonly valueSet: {
             readonly Direction: {
               readonly kind: 'valueSet';
-              readonly values: readonly ['IN', 'OUT'];
+              readonly values: readonly ['IN', 'OUT', 'INT'];
             };
             readonly Status: {
               readonly kind: 'valueSet';
@@ -1255,6 +1349,39 @@ type ContractBase = Omit<
               };
             };
             readonly relations: {
+              readonly documents: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'Document';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['departmentId'];
+                };
+              };
+              readonly receivedInternal: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'Document';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['toDepartmentId'];
+                };
+              };
+              readonly sentInternal: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'Document';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['fromDepartmentId'];
+                };
+              };
               readonly users: {
                 readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
                 readonly cardinality: '1:N';
@@ -1307,6 +1434,10 @@ type ContractBase = Omit<
                 readonly nullable: true;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
+              readonly departmentId: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
+              };
               readonly description: {
                 readonly nullable: true;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
@@ -1326,6 +1457,10 @@ type ContractBase = Omit<
               readonly fileSize: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly fromDepartmentId: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
               };
               readonly id: {
                 readonly nullable: false;
@@ -1375,6 +1510,10 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
+              readonly toDepartmentId: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
+              };
               readonly updatedAt: {
                 readonly nullable: false;
                 readonly type: {
@@ -1407,6 +1546,30 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['id'];
                 };
               };
+              readonly departmentInfo: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'Department';
+                };
+                readonly cardinality: 'N:1';
+                readonly nullable: true;
+                readonly on: {
+                  readonly localFields: readonly ['departmentId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+              readonly fromDepartment: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'Department';
+                };
+                readonly cardinality: 'N:1';
+                readonly nullable: true;
+                readonly on: {
+                  readonly localFields: readonly ['fromDepartmentId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
               readonly recipientCorrespondent: {
                 readonly to: {
                   readonly namespace: 'public' & NamespaceId;
@@ -1431,6 +1594,18 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['id'];
                 };
               };
+              readonly toDepartment: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'Department';
+                };
+                readonly cardinality: 'N:1';
+                readonly nullable: true;
+                readonly on: {
+                  readonly localFields: readonly ['toDepartmentId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
               readonly updatedBy: {
                 readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
                 readonly cardinality: 'N:1';
@@ -1450,10 +1625,12 @@ type ContractBase = Omit<
                 readonly createdAt: { readonly column: 'createdAt' };
                 readonly createdById: { readonly column: 'createdById' };
                 readonly department: { readonly column: 'department' };
+                readonly departmentId: { readonly column: 'departmentId' };
                 readonly description: { readonly column: 'description' };
                 readonly direction: { readonly column: 'direction' };
                 readonly documentDate: { readonly column: 'documentDate' };
                 readonly fileSize: { readonly column: 'fileSize' };
+                readonly fromDepartmentId: { readonly column: 'fromDepartmentId' };
                 readonly id: { readonly column: 'id' };
                 readonly isArchived: { readonly column: 'isArchived' };
                 readonly mimeType: { readonly column: 'mimeType' };
@@ -1466,6 +1643,7 @@ type ContractBase = Omit<
                 readonly status: { readonly column: 'status' };
                 readonly storedFileName: { readonly column: 'storedFileName' };
                 readonly subject: { readonly column: 'subject' };
+                readonly toDepartmentId: { readonly column: 'toDepartmentId' };
                 readonly updatedAt: { readonly column: 'updatedAt' };
                 readonly updatedById: { readonly column: 'updatedById' };
               };
@@ -1555,6 +1733,7 @@ type ContractBase = Omit<
             readonly members: readonly [
               { readonly name: 'IN'; readonly value: 'IN' },
               { readonly name: 'OUT'; readonly value: 'OUT' },
+              { readonly name: 'INT'; readonly value: 'INT' },
             ];
           };
           readonly Status: {
@@ -1570,6 +1749,7 @@ type ContractBase = Omit<
           readonly Direction: readonly [
             { readonly name: 'IN'; readonly value: 'IN' },
             { readonly name: 'OUT'; readonly value: 'OUT' },
+            { readonly name: 'INT'; readonly value: 'INT' },
           ];
           readonly Status: readonly [
             { readonly name: 'Pending'; readonly value: 'Pending' },

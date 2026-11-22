@@ -39,6 +39,10 @@
               {
                 "name": "OUT",
                 "value": "OUT"
+              },
+              {
+                "name": "INT",
+                "value": "INT"
               }
             ]
           },
@@ -384,6 +388,51 @@
               }
             },
             "relations": {
+              "documents": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "departmentId"
+                  ]
+                },
+                "to": {
+                  "model": "Document",
+                  "namespace": "public"
+                }
+              },
+              "receivedInternal": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "toDepartmentId"
+                  ]
+                },
+                "to": {
+                  "model": "Document",
+                  "namespace": "public"
+                }
+              },
+              "sentInternal": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "fromDepartmentId"
+                  ]
+                },
+                "to": {
+                  "model": "Document",
+                  "namespace": "public"
+                }
+              },
               "users": {
                 "cardinality": "1:N",
                 "on": {
@@ -468,6 +517,13 @@
                   "kind": "scalar"
                 }
               },
+              "departmentId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
               "description": {
                 "nullable": true,
                 "type": {
@@ -502,6 +558,13 @@
                 "nullable": false,
                 "type": {
                   "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "fromDepartmentId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/uuid@1",
                   "kind": "scalar"
                 }
               },
@@ -595,6 +658,13 @@
                   "kind": "scalar"
                 }
               },
+              "toDepartmentId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
               "updatedAt": {
                 "nullable": false,
                 "type": {
@@ -646,6 +716,38 @@
                   "namespace": "public"
                 }
               },
+              "departmentInfo": {
+                "cardinality": "N:1",
+                "nullable": true,
+                "on": {
+                  "localFields": [
+                    "departmentId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Department",
+                  "namespace": "public"
+                }
+              },
+              "fromDepartment": {
+                "cardinality": "N:1",
+                "nullable": true,
+                "on": {
+                  "localFields": [
+                    "fromDepartmentId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Department",
+                  "namespace": "public"
+                }
+              },
               "recipientCorrespondent": {
                 "cardinality": "N:1",
                 "nullable": true,
@@ -675,6 +777,22 @@
                 },
                 "to": {
                   "model": "Correspondent",
+                  "namespace": "public"
+                }
+              },
+              "toDepartment": {
+                "cardinality": "N:1",
+                "nullable": true,
+                "on": {
+                  "localFields": [
+                    "toDepartmentId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Department",
                   "namespace": "public"
                 }
               },
@@ -712,6 +830,9 @@
                 "department": {
                   "column": "department"
                 },
+                "departmentId": {
+                  "column": "departmentId"
+                },
                 "description": {
                   "column": "description"
                 },
@@ -723,6 +844,9 @@
                 },
                 "fileSize": {
                   "column": "fileSize"
+                },
+                "fromDepartmentId": {
+                  "column": "fromDepartmentId"
                 },
                 "id": {
                   "column": "id"
@@ -759,6 +883,9 @@
                 },
                 "subject": {
                   "column": "subject"
+                },
+                "toDepartmentId": {
+                  "column": "toDepartmentId"
                 },
                 "updatedAt": {
                   "column": "updatedAt"
@@ -1184,8 +1311,8 @@
             "Document": {
               "checks": [
                 {
-                  "expression": "\"direction\" IN ('IN', 'OUT')",
-                  "name": "Document_direction_check_9050e2ee",
+                  "expression": "\"direction\" IN ('IN', 'OUT', 'INT')",
+                  "name": "Document_direction_check_525aec6a",
                   "prefix": "Document_direction_check"
                 },
                 {
@@ -1230,6 +1357,11 @@
                   "dataType": "pg/text",
                   "nullable": true
                 },
+                "departmentId": {
+                  "codecId": "pg/uuid@1",
+                  "dataType": "pg/uuid",
+                  "nullable": true
+                },
                 "description": {
                   "codecId": "pg/text@1",
                   "dataType": "pg/text",
@@ -1266,6 +1398,11 @@
                     "value": 0
                   },
                   "nullable": false
+                },
+                "fromDepartmentId": {
+                  "codecId": "pg/uuid@1",
+                  "dataType": "pg/uuid",
+                  "nullable": true
                 },
                 "id": {
                   "codecId": "pg/uuid@1",
@@ -1340,6 +1477,11 @@
                   "codecId": "pg/text@1",
                   "dataType": "pg/text",
                   "nullable": false
+                },
+                "toDepartmentId": {
+                  "codecId": "pg/uuid@1",
+                  "dataType": "pg/uuid",
+                  "nullable": true
                 },
                 "updatedAt": {
                   "codecId": "pg/timestamptz-date@1",
@@ -1455,6 +1597,66 @@
                     "namespaceId": "public",
                     "tableName": "Correspondent"
                   }
+                },
+                {
+                  "index": {
+                    "name": "Document_departmentId_idx_8e261ed8"
+                  },
+                  "onDelete": "setNull",
+                  "source": {
+                    "columns": [
+                      "departmentId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "Document"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "Department"
+                  }
+                },
+                {
+                  "index": {
+                    "name": "Document_fromDepartmentId_idx_57753065"
+                  },
+                  "onDelete": "setNull",
+                  "source": {
+                    "columns": [
+                      "fromDepartmentId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "Document"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "Department"
+                  }
+                },
+                {
+                  "index": {
+                    "name": "Document_toDepartmentId_idx_31864033"
+                  },
+                  "onDelete": "setNull",
+                  "source": {
+                    "columns": [
+                      "toDepartmentId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "Document"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "Department"
+                  }
                 }
               ],
               "indexes": [
@@ -1476,6 +1678,22 @@
                 },
                 {
                   "columns": [
+                    "departmentId"
+                  ],
+                  "name": "Document_departmentId_idx_8e261ed8",
+                  "prefix": "Document_departmentId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "fromDepartmentId"
+                  ],
+                  "name": "Document_fromDepartmentId_idx_57753065",
+                  "prefix": "Document_fromDepartmentId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
                     "recipientId"
                   ],
                   "name": "Document_recipientId_idx_c9527cf8",
@@ -1488,6 +1706,14 @@
                   ],
                   "name": "Document_senderId_idx_4689c490",
                   "prefix": "Document_senderId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "toDepartmentId"
+                  ],
+                  "name": "Document_toDepartmentId_idx_31864033",
+                  "prefix": "Document_toDepartmentId_idx",
                   "unique": false
                 },
                 {
@@ -1625,7 +1851,8 @@
               "kind": "valueSet",
               "values": [
                 "IN",
-                "OUT"
+                "OUT",
+                "INT"
               ]
             },
             "Status": {
@@ -1642,7 +1869,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "ca463038f3d29b347062a8325bff9123e99554fd498e04be9e1f5c787b72629d"
+    "storageHash": "84fcd29852b0228846071970d9f74090afd8d744a73697cd895e75046ad5623e"
   },
   "execution": {
     "executionHash": "6bcbb793edc2ae430f447ae17e8dc0521b02e575395973bbaf48ce1112e557d3",

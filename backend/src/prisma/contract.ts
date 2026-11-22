@@ -7,6 +7,7 @@ const Direction = enumType(
   { codecId: "pg/text@1" } as const,
   member("IN", "IN"),
   member("OUT", "OUT"),
+  member("INT", "INT"), // internal: between ministry departments
 );
 
 const Status = enumType(
@@ -83,7 +84,12 @@ export const contract = defineContract(
         recipient: field.column(type.String()).optional(),
         senderId: field.column(type.Uuid()).optional(),
         recipientId: field.column(type.Uuid()).optional(),
+        // Name snapshot of departmentId (older records may only have this text).
         department: field.column(type.String()).optional(),
+        departmentId: field.column(type.Uuid()).optional(),
+        // Internal (INT) documents: sending and receiving department.
+        fromDepartmentId: field.column(type.Uuid()).optional(),
+        toDepartmentId: field.column(type.Uuid()).optional(),
         documentDate: field.column(type.DateTime()).default(now()),
         status: field.namedType(Status).default("Pending"),
         isArchived: field.column(type.Boolean()).default(false),
@@ -131,6 +137,9 @@ export const contract = defineContract(
         }),
         Department: Department.relations({
           users: rel.hasMany(User, { by: "department" }),
+          documents: rel.hasMany(Document, { by: "departmentId" }),
+          sentInternal: rel.hasMany(Document, { by: "fromDepartmentId" }),
+          receivedInternal: rel.hasMany(Document, { by: "toDepartmentId" }),
         }),
         Document: Document.relations({
           createdBy: rel
@@ -147,6 +156,15 @@ export const contract = defineContract(
             .sql(setNull),
           recipientCorrespondent: rel
             .belongsTo(Correspondent, { from: "recipientId", to: "id" })
+            .sql(setNull),
+          departmentInfo: rel
+            .belongsTo(Department, { from: "departmentId", to: "id" })
+            .sql(setNull),
+          fromDepartment: rel
+            .belongsTo(Department, { from: "fromDepartmentId", to: "id" })
+            .sql(setNull),
+          toDepartment: rel
+            .belongsTo(Department, { from: "toDepartmentId", to: "id" })
             .sql(setNull),
         }),
         Correspondent: Correspondent.relations({
