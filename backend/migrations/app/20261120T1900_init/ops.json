@@ -1,0 +1,148 @@
+[
+  {
+    "id": "table.AuditLog",
+    "label": "Create table \"AuditLog\"",
+    "summary": "Creates table \"AuditLog\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "AuditLog"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"AuditLog\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"AuditLog\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "table \"AuditLog\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"AuditLog\"",
+        "sql": "CREATE TABLE \"public\".\"AuditLog\" (\n  \"action\" text NOT NULL,\n  \"id\" uuid NOT NULL,\n  \"ipAddress\" text,\n  \"timestamp\" timestamptz(3) DEFAULT (now()) NOT NULL,\n  \"userId\" uuid NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"AuditLog\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3))) AS \"result\"",
+        "params": [
+          "\"public\".\"AuditLog\"",
+          "r",
+          "p"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "table \"AuditLog\""
+        }
+      }
+    ]
+  },
+  {
+    "id": "table.Document",
+    "label": "Create table \"Document\"",
+    "summary": "Creates table \"Document\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "Document"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"Document\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Document\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "table \"Document\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"Document\"",
+        "sql": "CREATE TABLE \"public\".\"Document\" (\n  \"CreatedBy\" uuid,\n  \"UpdatedBy\" uuid,\n  \"createdAt\" timestamptz(3) DEFAULT (now()) NOT NULL,\n  \"description\" text,\n  \"direction\" text NOT NULL,\n  \"fileSize\" int4 NOT NULL,\n  \"id\" uuid NOT NULL,\n  \"isArchived\" bool DEFAULT false NOT NULL,\n  \"mimeType\" text NOT NULL,\n  \"originalFileName\" text NOT NULL,\n  \"receipient\" text NOT NULL,\n  \"referenceNumber\" text NOT NULL,\n  \"sender\" text NOT NULL,\n  \"status\" text NOT NULL,\n  \"storedFileName\" text NOT NULL,\n  \"subject\" text NOT NULL,\n  \"updatedAt\" timestamptz(3) NOT NULL,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"Document_direction_check_0c542325\" CHECK (\"direction\" IN ('INC', 'OUT', 'INT')),\n  CONSTRAINT \"Document_status_check_19a2b525\" CHECK (\"status\" IN ('pending', 'approved', 'rejected'))\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"Document\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3))) AS \"result\"",
+        "params": [
+          "\"public\".\"Document\"",
+          "r",
+          "p"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "table \"Document\""
+        }
+      }
+    ]
+  },
+  {
+    "id": "unique.Document.Document_referenceNumber_key",
+    "label": "Add unique constraint on \"Document\" (referenceNumber)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "Document_referenceNumber_key",
+        "table": "Document"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"Document_referenceNumber_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Document_referenceNumber_key",
+          "public",
+          "\"public\".\"Document\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "constraint \"Document_referenceNumber_key\" on \"Document\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"Document_referenceNumber_key\"",
+        "sql": "ALTER TABLE \"public\".\"Document\" ADD CONSTRAINT \"Document_referenceNumber_key\" UNIQUE (\"referenceNumber\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify unique constraint \"Document_referenceNumber_key\" exists on (referenceNumber)",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb)) AS \"result\"",
+        "params": [
+          "Document_referenceNumber_key",
+          "public",
+          "\"public\".\"Document\"",
+          "u",
+          "[\"referenceNumber\"]"
+        ]
+      }
+    ]
+  }
+]
