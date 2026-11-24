@@ -8,7 +8,8 @@ import { db } from "../config/db.js";
 const Document = db.orm.public.Document;
 const AuditLog = db.orm.public.AuditLog;
 
-const DIRECTIONS = ["IN", "OUT"];
+// IN = received, OUT = sent, INT = internal between ministry departments.
+const DIRECTIONS = ["IN", "OUT", "INT"];
 const STATUSES = ["Pending", "Processing", "Completed"];
 
 function makeReference(direction) {
@@ -42,26 +43,65 @@ async function createAudit(tx, req, data) {
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Resolve a sender/recipient id from the request.
+function badRequest(message) {
+  const err = new Error(message);
+  err.status = 400;
+  return err;
+}
+
+// Resolve a referenced row id from the request.
 // Returns undefined when not sent, null when cleared, the row when found,
 // or throws a 400 error when the id is unknown.
-async function resolveCorrespondent(value) {
+async function resolveRef(collection, value, message) {
   if (value === undefined) return undefined;
   if (value === null || value === "") return null;
 
   const row = UUID_RE.test(String(value))
-    ? await db.orm.public.Correspondent.select("id", "name")
-        .where({ id: String(value) })
-        .first()
+    ? await collection.select("id", "name").where({ id: String(value) }).first()
     : null;
 
-  if (!row) {
-    const err = new Error("Selected sender/recipient does not exist.");
-    err.status = 400;
-    throw err;
-  }
+  if (!row) throw badRequest(message);
   return row;
 }
+
+const resolveCorrespondent = (value) =>
+  resolveRef(db.orm.public.Correspondent, value, "Selected sender/recipient does not exist.");
+
+const resolveDepartment = (value) =>
+  resolveRef(db.orm.public.Department, value, "Selected department does not exist.");
+
+// Applies departmentId (+ name snapshot) and, for internal documents,
+// fromDepartmentId / toDepartmentId. `existing` is the stored row on update.
+async function applyDepartments(body, data, direction, existing = null) {
+  const department = await resolveDepartment(body.departmentId);
+  if (department !== undefined) {
+    data.departmentId = department?.id ?? null;
+    data.department = department?.name ?? null;
+  }
+
+  if (direction !== "INT") return;
+
+  const from = await resolveDepartment(body.fromDepartmentId);
+  if (from !== undefined) data.fromDepartmentId = from?.id ?? null;
+  const to = await resolveDepartment(body.toDepartmentId);
+  if (to !== undefined) data.toDepartmentId = to?.id ?? null;
+
+  const finalFrom = "fromDepartmentId" in data ? data.fromDepartmentId : existing?.fromDepartmentId;
+  const finalTo = "toDepartmentId" in data ? data.toDepartmentId : existing?.toDepartmentId;
+
+  if (!finalFrom || !finalTo) {
+    throw badRequest("Internal documents need a From department and a To department.");
+  }
+  if (finalFrom === finalTo) {
+    throw badRequest("From and To departments must be different.");
+  }
+}
+
+// Names shown in lists for internal documents.
+const withDepartmentNames = (q) =>
+  q
+    .include("fromDepartment", (d) => d.select("id", "name"))
+    .include("toDepartment", (d) => d.select("id", "name"));
 
 // Applies senderId/recipientId from the body onto `data` (id + name snapshot).
 async function applyCorrespondents(body, data) {
@@ -87,7 +127,7 @@ function parseDate(value) {
 // GET /documents
 export async function listDocuments(req, res, next) {
   try {
-    const { direction, archived, q, status, correspondentId } = req.query;
+    const { direction, archived, q, status, correspondentId, departmentId } = req.query;
 
     let query = Document;
 
@@ -112,6 +152,17 @@ export async function listDocuments(req, res, next) {
       );
     }
 
+    // Documents assigned to, sent from, or sent to this department.
+    if (typeof departmentId === "string" && UUID_RE.test(departmentId)) {
+      query = query.where((d) =>
+        or(
+          d.departmentId.eq(departmentId),
+          d.fromDepartmentId.eq(departmentId),
+          d.toDepartmentId.eq(departmentId),
+        ),
+      );
+    }
+
     if (typeof q === "string" && q.trim()) {
       const search = `%${q.trim().slice(0, 100)}%`;
 
@@ -125,7 +176,7 @@ export async function listDocuments(req, res, next) {
       );
     }
 
-    const documents = await query
+    const documents = await withDepartmentNames(query)
       .include("createdBy", (user) => user.select("id", "name", "email"))
       .orderBy((d) => d.createdAt.desc())
       .limit(300)
@@ -154,7 +205,7 @@ export async function createDocument(req, res, next) {
     let validationError = null;
 
     if (!DIRECTIONS.includes(direction)) {
-      validationError = "Direction must be IN or OUT.";
+      validationError = "Direction must be IN, OUT or INT.";
     } else if (typeof subject !== "string" || !subject.trim()) {
       validationError = "Subject is required.";
     } else if (!STATUSES.includes(status)) {
@@ -173,9 +224,10 @@ export async function createDocument(req, res, next) {
       direction,
       subject: subject.trim(),
       description,
-      sender: sender || null,
-      recipient: recipient || null,
-      department,
+      // Internal documents have departments, not external parties.
+      sender: direction === "INT" ? null : sender || null,
+      recipient: direction === "INT" ? null : recipient || null,
+      department: department || null,
       documentDate: parseDate(documentDate) ?? new Date(),
       status,
       createdById: req.user.id,
@@ -187,7 +239,8 @@ export async function createDocument(req, res, next) {
       isArchived: false,
     };
 
-    await applyCorrespondents(req.body, documentData);
+    if (direction !== "INT") await applyCorrespondents(req.body, documentData);
+    await applyDepartments(req.body, documentData, direction);
 
     const document = await db.transaction(async (tx) => {
       const created = await tx.orm.public.Document.create(documentData);
@@ -211,7 +264,7 @@ export async function createDocument(req, res, next) {
 // GET /documents/:id
 export async function getDocument(req, res, next) {
   try {
-    const document = await Document.where({ id: req.params.id })
+    const document = await withDepartmentNames(Document.where({ id: req.params.id }))
       .include("createdBy", (user) => user.select("id", "name", "email"))
       .include("archivedBy", (user) => user.select("id", "name", "email"))
       .first();
@@ -241,15 +294,9 @@ export async function updateDocument(req, res, next) {
       });
     }
 
-    const allowed = [
-      "subject",
-      "description",
-      "sender",
-      "recipient",
-      "department",
-      "documentDate",
-      "status",
-    ];
+    // Sender/recipient/department names come from their dropdown ids
+    // (applyCorrespondents / applyDepartments below), not free text.
+    const allowed = ["subject", "description", "documentDate", "status"];
 
     if (req.body.status !== undefined && !STATUSES.includes(req.body.status)) {
       if (req.file?.path) safeUnlink(req.file.path);
@@ -281,7 +328,8 @@ export async function updateDocument(req, res, next) {
       return res.status(400).json({ message: "Subject is required." });
     }
 
-    await applyCorrespondents(req.body, updateData);
+    if (existing.direction !== "INT") await applyCorrespondents(req.body, updateData);
+    await applyDepartments(req.body, updateData, existing.direction, existing);
 
     if (req.file) {
       updateData.originalFileName = req.file.originalname;
@@ -444,6 +492,7 @@ export async function dashboardStats(_req, res, next) {
       totalResult,
       incomingResult,
       outgoingResult,
+      internalResult,
       pendingResult,
       archivedResult,
       recent,
@@ -457,6 +506,10 @@ export async function dashboardStats(_req, res, next) {
       })),
 
       Document.where({ direction: "OUT", isArchived: false }).aggregate(
+        (a) => ({ count: a.count() }),
+      ),
+
+      Document.where({ direction: "INT", isArchived: false }).aggregate(
         (a) => ({ count: a.count() }),
       ),
 
@@ -487,6 +540,7 @@ export async function dashboardStats(_req, res, next) {
         total: totalResult.count,
         incoming: incomingResult.count,
         outgoing: outgoingResult.count,
+        internal: internalResult.count,
         pending: pendingResult.count,
         archived: archivedResult.count,
       },
@@ -581,7 +635,7 @@ export async function documentReports(req, res, next) {
 
     if (!DIRECTIONS.includes(direction)) {
       return res.status(400).json({
-        message: "Report direction must be IN or OUT.",
+        message: "Report direction must be IN, OUT or INT.",
       });
     }
 
@@ -611,15 +665,30 @@ export async function documentReports(req, res, next) {
       }
     }
 
+    // Optional filter for internal reports: documents from or to a department.
+    let department = null;
+    if (direction === "INT" && req.query.departmentId) {
+      try {
+        department = await resolveDepartment(String(req.query.departmentId));
+      } catch (err) {
+        return res.status(err.status || 400).json({ message: err.message });
+      }
+    }
+
     let query = Document.where({ direction });
-    if (correspondent) {
+    if (correspondent && direction !== "INT") {
       query =
         direction === "IN"
           ? query.where({ senderId: correspondent.id })
           : query.where({ recipientId: correspondent.id });
     }
+    if (department) {
+      query = query.where((d) =>
+        or(d.fromDepartmentId.eq(department.id), d.toDepartmentId.eq(department.id)),
+      );
+    }
 
-    const documents = await query
+    const documents = await withDepartmentNames(query)
       .where((d) => d.documentDate.gte(range.start))
       .where((d) => d.documentDate.lt(range.end))
       .select(
@@ -652,6 +721,7 @@ export async function documentReports(req, res, next) {
       period: range.period,
       ...range.params,
       correspondent,
+      department,
       summary,
       documents,
     });
