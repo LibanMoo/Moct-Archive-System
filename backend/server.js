@@ -11,6 +11,7 @@ import documentRoutes from "./routes/documentRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import auditRoutes from "./routes/auditRoutes.js";
 import correspondentRoutes from "./routes/correspondentRoutes.js";
+import departmentRoutes from "./routes/departmentRoutes.js";
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
 
 const app = express();
@@ -32,6 +33,7 @@ app.use("/api/documents", documentRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/audit-logs", auditRoutes);
 app.use("/api/correspondents", correspondentRoutes);
+app.use("/api/departments", departmentRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
