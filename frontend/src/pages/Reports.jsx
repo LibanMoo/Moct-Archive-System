@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { ArrowDownToLine, ArrowUpFromLine, CalendarDays, Download, FileText, Printer, RefreshCw } from "lucide-react";
+import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, CalendarDays, Download, FileText, Printer, RefreshCw } from "lucide-react";
 import api from "../services/api";
 import ministryLogo from "../assets/ministry-logo.png";
 
@@ -19,7 +19,8 @@ const safeCell = value => { const text = String(value ?? ""); return /^[=+\-@\t\
 
 export default function Reports({ direction = "IN" }) {
   const isIn = direction === "IN";
-  const word = isIn ? "Incoming" : "Outgoing";
+  const isInt = direction === "INT";
+  const word = isInt ? "Internal" : isIn ? "Incoming" : "Outgoing";
   const [period, setPeriod] = useState("daily");
   const [date, setDate] = useState(todayValue);
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -29,11 +30,15 @@ export default function Reports({ direction = "IN" }) {
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [correspondents, setCorrespondents] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  // Selected sender (IN), recipient (OUT) or department (INT).
   const [correspondentId, setCorrespondentId] = useState("");
-  const partyWord = isIn ? "sender" : "recipient";
+  const partyWord = isInt ? "department" : isIn ? "sender" : "recipient";
+  const partyOptions = isInt ? departments : correspondents;
 
   useEffect(() => {
     api.get("/correspondents").then(({ data }) => setCorrespondents(data.correspondents || [])).catch(() => {});
+    api.get("/departments").then(({ data }) => setDepartments(data.departments || [])).catch(() => {});
   }, []);
 
   // Switching between incoming and outgoing clears the sender/recipient filter.
@@ -42,7 +47,7 @@ export default function Reports({ direction = "IN" }) {
   useEffect(() => {
     let cancelled = false;
     const params = { direction, period, ...(period === "daily" ? { date } : period === "monthly" ? { year, month } : { year }) };
-    if (correspondentId) params.correspondentId = correspondentId;
+    if (correspondentId) params[isInt ? "departmentId" : "correspondentId"] = correspondentId;
     setLoading(true); setError(""); setReport(null);
     api.get("/documents/reports", { params })
       .then(({ data }) => { if (!cancelled) setReport(data); })
@@ -54,17 +59,20 @@ export default function Reports({ direction = "IN" }) {
   const summary = report?.summary || emptySummary;
   const documents = report?.documents || [];
   const basePeriodLabel = period === "daily" ? dateLabel(`${date}T00:00:00Z`) : period === "monthly" ? `${monthNames[month - 1]} ${year}` : `Year ${year}`;
-  const partyName = report?.correspondent?.name || "";
-  const periodLabel = partyName ? `${basePeriodLabel} · ${isIn ? "From" : "To"} ${partyName}` : basePeriodLabel;
+  const partyName = (isInt ? report?.department?.name : report?.correspondent?.name) || "";
+  const partyPrefix = isInt ? "Department:" : isIn ? "From" : "To";
+  const periodLabel = partyName ? `${basePeriodLabel} · ${partyPrefix} ${partyName}` : basePeriodLabel;
+  const partyColumns = isInt ? ["From department", "To department"] : ["Sender", "Recipient"];
+  const partyValues = doc => isInt ? [doc.fromDepartment?.name, doc.toDepartment?.name] : [doc.sender, doc.recipient];
   const reportTitle = `${periods.find(p => p[0] === period)[1]} ${word} Report`;
   const years = useMemo(() => Array.from({ length: 12 }, (_, i) => currentYear + 1 - i), []);
 
   function exportCsv() {
     const rows = [
       [reportTitle], ["Period", basePeriodLabel], ["Direction", direction],
-      [isIn ? "Sender" : "Recipient", partyName || `All ${partyWord}s`], ["Total documents", summary.total], [],
-      ["#", "Reference Number", "Subject", "Date", "Sender", "Recipient", "Department", "Status"],
-      ...documents.map((doc, i) => [i + 1, doc.referenceNumber, doc.subject, dateLabel(doc.documentDate), doc.sender, doc.recipient, doc.department, doc.status])
+      [partyWord[0].toUpperCase() + partyWord.slice(1), partyName || `All ${partyWord}s`], ["Total documents", summary.total], [],
+      ["#", "Reference Number", "Subject", "Date", ...partyColumns, ...(isInt ? [] : ["Department"]), "Status"],
+      ...documents.map((doc, i) => [i + 1, doc.referenceNumber, doc.subject, dateLabel(doc.documentDate), ...partyValues(doc), ...(isInt ? [] : [doc.department]), doc.status])
     ];
     const csv = rows.map(row => row.map(v => `"${safeCell(v).replaceAll('"', '""')}"`).join(",")).join("\r\n");
     const url = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }));
@@ -85,7 +93,7 @@ export default function Reports({ direction = "IN" }) {
     </div>
 
     <div className="page-heading">
-      <div><div className="eyebrow">{isIn ? "MINISTRY INCOMING REGISTER" : "MINISTRY OUTGOING REGISTER"}</div><h1>{word} Reports</h1><p>{isIn ? "Documents received by the Ministry." : "Documents sent by the Ministry."} Filtered by the document date.</p></div>
+      <div><div className="eyebrow">MINISTRY {word.toUpperCase()} REGISTER</div><h1>{word} Reports</h1><p>{isInt ? "Documents exchanged between ministry departments." : isIn ? "Documents received by the Ministry." : "Documents sent by the Ministry."} Filtered by the document date.</p></div>
       <div className="report-heading-actions">
         <button className="secondary-button" onClick={() => window.print()} disabled={!report}><Printer size={15}/> Print</button>
         <button className="primary-button" onClick={exportCsv} disabled={!report}><Download size={15}/> Export CSV</button>
@@ -95,6 +103,7 @@ export default function Reports({ direction = "IN" }) {
     <div className="report-direction-tabs">
       <NavLink to="/reports/incoming" className={({ isActive }) => `report-direction-tab ${isActive ? "active" : ""}`}><ArrowDownToLine size={16}/> Incoming Reports (IN)</NavLink>
       <NavLink to="/reports/outgoing" className={({ isActive }) => `report-direction-tab ${isActive ? "active" : ""}`}><ArrowUpFromLine size={16}/> Outgoing Reports (OUT)</NavLink>
+      <NavLink to="/reports/internal" className={({ isActive }) => `report-direction-tab ${isActive ? "active" : ""}`}><ArrowLeftRight size={16}/> Internal Reports (INT)</NavLink>
     </div>
 
     <div className="panel report-filters">
@@ -104,9 +113,9 @@ export default function Reports({ direction = "IN" }) {
         {period === "daily" && <input aria-label="Report date" type="date" value={date} onChange={e => e.target.value && setDate(e.target.value)} />}
         {period === "monthly" && <select aria-label="Month" value={month} onChange={e => setMonth(Number(e.target.value))}>{monthNames.map((name, i) => <option key={name} value={i + 1}>{name}</option>)}</select>}
         {period !== "daily" && <select aria-label="Year" value={year} onChange={e => setYear(Number(e.target.value))}>{years.map(y => <option key={y} value={y}>{y}</option>)}</select>}
-        <select aria-label={isIn ? "Sender" : "Recipient"} value={correspondentId} onChange={e => setCorrespondentId(e.target.value)}>
+        <select aria-label={partyWord} value={correspondentId} onChange={e => setCorrespondentId(e.target.value)}>
           <option value="">All {partyWord}s</option>
-          {correspondents.map(c => <option key={c.id} value={c.id}>{c.name}{c.active ? "" : " (inactive)"}</option>)}
+          {partyOptions.map(c => <option key={c.id} value={c.id}>{c.name}{c.active === false ? " (inactive)" : ""}</option>)}
         </select>
         <button className="icon-button report-refresh" onClick={() => setRefreshKey(k => k + 1)} title="Refresh report"><RefreshCw size={16}/></button>
       </div>
@@ -118,11 +127,11 @@ export default function Reports({ direction = "IN" }) {
     <div className="report-stats-grid five">{cards.map(([label, value]) => <div className="report-stat" key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>
 
     <div className="panel report-chart-panel daily-report-panel">
-      <div className="panel-heading"><div><h2><FileText size={17} style={{ verticalAlign: "-3px", marginRight: 7 }}/>{word} document register</h2><p>Reference, subject, date, sender, recipient, department and status</p></div><span className="report-period-tag">{summary.total} records</span></div>
+      <div className="panel-heading"><div><h2><FileText size={17} style={{ verticalAlign: "-3px", marginRight: 7 }}/>{word} document register</h2><p>{isInt ? "Reference, subject, date, from/to department and status" : "Reference, subject, date, sender, recipient, department and status"}</p></div><span className="report-period-tag">{summary.total} records</span></div>
       {loading ? <div className="report-loading">Loading report data…</div>
         : documents.length === 0 ? <div className="report-empty">No {word.toLowerCase()} documents were registered for this period{partyName ? ` ${isIn ? "from" : "to"} ${partyName}` : ""}.</div>
-        : <div className="report-table-wrap"><table className="report-table"><thead><tr><th>#</th><th>Reference No.</th><th>Subject</th><th>Date</th><th>Sender</th><th>Recipient</th><th>Department</th><th>Status</th></tr></thead>
-          <tbody>{documents.map((doc, index) => <tr key={doc.id}><td>{index + 1}</td><td className="report-reference">{doc.referenceNumber}</td><td className="report-subject">{doc.subject}</td><td>{dateLabel(doc.documentDate)}</td><td>{doc.sender || "—"}</td><td>{doc.recipient || "—"}</td><td>{doc.department || "—"}</td><td><span className={`report-status status-${doc.status?.toLowerCase()}`}>{doc.status}</span></td></tr>)}</tbody></table></div>}
+        : <div className="report-table-wrap"><table className="report-table"><thead><tr><th>#</th><th>Reference No.</th><th>Subject</th><th>Date</th>{partyColumns.map(c => <th key={c}>{c}</th>)}{!isInt && <th>Department</th>}<th>Status</th></tr></thead>
+          <tbody>{documents.map((doc, index) => <tr key={doc.id}><td>{index + 1}</td><td className="report-reference">{doc.referenceNumber}</td><td className="report-subject">{doc.subject}</td><td>{dateLabel(doc.documentDate)}</td>{partyValues(doc).map((v, i) => <td key={i}>{v || "—"}</td>)}{!isInt && <td>{doc.department || "—"}</td>}<td><span className={`report-status status-${doc.status?.toLowerCase()}`}>{doc.status}</span></td></tr>)}</tbody></table></div>}
     </div>
     <div className="report-note">Generated from the Archive & Document Management System. Figures use the document date recorded for each document.</div>
   </div>;
