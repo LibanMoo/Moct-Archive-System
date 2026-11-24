@@ -8,6 +8,7 @@ import Users from "./pages/Users";
 import AuditLogs from "./pages/AuditLogs";
 import Reports from "./pages/Reports";
 import Correspondents from "./pages/Correspondents";
+import Departments from "./pages/Departments";
 
 function ArchivePage() { return <DocumentManager archived />; }
 
@@ -22,6 +23,9 @@ export default function App() {
         <Route path="/reports/outgoing" element={<Reports direction="OUT" />} />
         <Route path="/incoming" element={<DocumentManager direction="IN" />} />
         <Route path="/outgoing" element={<DocumentManager direction="OUT" />} />
+        <Route path="/internal" element={<DocumentManager direction="INT" />} />
+        <Route path="/reports/internal" element={<Reports direction="INT" />} />
+        <Route path="/departments" element={<Departments />} />
         <Route path="/archive" element={<ArchivePage />} />
         <Route path="/correspondents" element={<Correspondents />} />
         <Route element={<ProtectedRoute adminOnly />}>
